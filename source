@@ -1,0 +1,215 @@
+-- Load the GUI Library
+local library = loadstring(game:HttpGet(('https://garfieldscripts.xyz/ui-libs/wallys-ui.lua')))()
+
+-- Create the main window
+local window = library:CreateWindow("MM2 Accurate Script")
+
+-- Define player
+local player = game.Players.LocalPlayer
+if not player then
+    warn("Player not loaded.")
+    return
+end
+
+-- Variables
+local espEnabled = false
+local hitboxSize = Vector3.new(2, 2, 2)
+local hitboxColor = Color3.fromRGB(255, 0, 0)
+local espBoxes = {}
+
+-- Function to safely execute code with error handling
+local function safeExe(func)
+    local success, err = pcall(func)
+    if not success then
+        warn("Error in safeExe: " .. err)
+    end
+end
+
+-- Fast wait function
+local function fastWait(seconds)
+    task.wait(seconds or 0.1)
+end
+
+-- Function to create ESP for a player
+local function createESP(player)
+    if espBoxes[player] then return end
+    local box = Instance.new("BoxHandleAdornment")
+    box.Size = Vector3.new(4, 6, 4)
+    box.Color3 = hitboxColor
+    box.AlwaysOnTop = true
+    box.ZIndex = 10
+    box.Parent = player.Character:FindFirstChild("HumanoidRootPart")
+    espBoxes[player] = box
+end
+
+-- Function to remove ESP from a player
+local function removeESP(player)
+    if espBoxes[player] then
+        espBoxes[player]:Destroy()
+        espBoxes[player] = nil
+    end
+end
+
+-- Hitbox Adjustment Function
+local function adjustHitbox(targetPlayer, size, color)
+    if targetPlayer and targetPlayer.Character then
+        local humanoidRootPart = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            humanoidRootPart.Size = size
+            humanoidRootPart.Color = color
+            humanoidRootPart.Transparency = 0.5
+        end
+    end
+end
+
+-- Function to set hitboxes for players
+local function setHitboxes(size, color)
+    for _, v in pairs(game.Players:GetPlayers()) do
+        safeExe(function()
+            if v.Team and (v.Team.Name == "Murderer" or v.Team.Name == "Sheriff") then
+                adjustHitbox(v, size, color)
+            end
+        end)
+    end
+end
+
+-- Tab for Hitbox Settings
+local hitboxTab = window:CreateTab("Hitbox Settings")
+
+-- Hitbox Size Input
+hitboxTab:CreateInput("Hitbox Size (X)", "Enter size for X", function(value)
+    hitboxSize = Vector3.new(tonumber(value) or 2, hitboxSize.Y, hitboxSize.Z)
+end)
+
+hitboxTab:CreateInput("Hitbox Size (Y)", "Enter size for Y", function(value)
+    hitboxSize = Vector3.new(hitboxSize.X, tonumber(value) or 2, hitboxSize.Z)
+end)
+
+hitboxTab:CreateInput("Hitbox Size (Z)", "Enter size for Z", function(value)
+    hitboxSize = Vector3.new(hitboxSize.X, hitboxSize.Y, tonumber(value) or 2)
+end)
+
+-- Hitbox Color Picker
+hitboxTab:CreateColorPicker("Hitbox Color", Color3.fromRGB(255, 0, 0), function(color)
+    hitboxColor = color
+end)
+
+-- Apply Hitbox Button
+hitboxTab:CreateButton("Apply Hitboxes", function()
+    setHitboxes(hitboxSize, hitboxColor)
+end)
+
+-- Toggle ESP
+hitboxTab:CreateToggle("Enable ESP", false, function(state)
+    espEnabled = state
+    for _, v in pairs(game.Players:GetPlayers()) do
+        if espEnabled and v ~= player then
+            safeExe(function() createESP(v) end)
+        else
+            safeExe(function() removeESP(v) end)
+        end
+    end
+end)
+
+-- Function to remove all selected hitboxes
+local function removeSelectedHitboxes()
+    for _, v in pairs(game.Players:GetPlayers()) do
+        safeExe(function()
+            if v.Team and (v.Team.Name == "Murderer" or v.Team.Name == "Sheriff") then
+                adjustHitbox(v, Vector3.new(2, 2, 2), Color3.fromRGB(255, 255, 255)) -- Reset to default
+            end
+        end)
+    end
+end
+
+-- Remove Hitboxes Button
+hitboxTab:CreateButton("Remove Hitboxes", function()
+    removeSelectedHitboxes()
+end)
+
+-- Hitbox Selector Tab
+local hitboxSelectorTab = window:CreateTab("Hitbox Selector")
+
+-- Hitbox Part Selection
+local hitboxParts = {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"}
+local selectedParts = {}
+
+for _, partName in ipairs(hitboxParts) do
+    hitboxSelectorTab:CreateToggle(partName, false, function(state)
+        if state then
+            selectedParts[partName] = true
+        else
+            selectedParts[partName] = nil
+        end
+    end)
+end
+
+-- Apply Selected Hitboxes Button
+hitboxSelectorTab:CreateButton("Apply Selected Hitboxes", function()
+    for partName, _ in pairs(selectedParts) do
+        for _, v in pairs(game.Players:GetPlayers()) do
+            safeExe(function()
+                if v.Character and v.Team and (v.Team.Name == "Murderer" or v.Team.Name == "Sheriff") then
+                    local part = v.Character:FindFirstChild(partName)
+                    if part then
+                        adjustHitbox(v, Vector3.new(2, 2, 2), Color3.fromRGB(255, 0, 0)) -- Example size and color
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- Credits Tab
+local creditsTab = window:CreateTab("Credits")
+creditsTab:CreateLabel("Discord: LanceClocks")
+
+-- Final Setup for Existing Players
+for _, v in pairs(game.Players:GetPlayers()) do
+    safeExe(function()
+        if espEnabled then
+            createESP(v)
+        end
+        if v.Team and (v.Team.Name == "Murderer" or v.Team.Name == "Sheriff") then
+            adjustHitbox(v, hitboxSize, hitboxColor)
+        end
+    end)
+end
+
+-- Player Added and Removed Event Handling
+game.Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(function()
+        safeExe(function()
+            if espEnabled then
+                createESP(newPlayer)
+            end
+            if newPlayer.Team and (newPlayer.Team.Name == "Murderer" or newPlayer.Team.Name == "Sheriff") then
+                adjustHitbox(newPlayer, hitboxSize, hitboxColor)
+            end
+        end)
+    end)
+end)
+
+game.Players.PlayerRemoving:Connect(function(removedPlayer)
+    safeExe(function()
+        removeESP(removedPlayer)
+    end)
+end)
+
+-- Informational Message on the Script's Purpose
+library:CreateNotification("Welcome to MM2 Accurate Script!", "This script is designed to enhance gameplay with customizable hitboxes and ESP. Enjoy!", 5)
+
+-- Function to close the library and cleanup
+library:CreateButton("Exit Script", function()
+    library:Close()
+end)
+
+-- Check for player leaving
+player.AncestryChanged:Connect(function(_, parent)
+    if not parent then
+        library:Close() -- Close the script if the player leaves
+    end
+end)
+
+-- Print completion message
+print("MM2 Accurate Script Loaded Successfully!")
